@@ -1,0 +1,21 @@
+server:
+  port: 8080
+  mode: debug
+
+database:
+  driver: mysql
+  host: localhost  # 如果在docker网络中使用，可以改为 mysql
+  port: 3306
+  username: novel_user
+  password: novel_password
+  dbname: novel_platform
+
+redis:
+  host: localhost  # 如果在docker网络中使用，可以改为 redis
+  port: 6379
+  password: ""
+  db: 0
+
+jwt:
+  secret: your_jwt_secret
+  expire: 24h 
