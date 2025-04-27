@@ -9,7 +9,7 @@
     <!-- 页脚 -->
     <el-footer class="footer">
       <div class="footer-content">
-        <p>&copy; 2024 AI小说平台 All Rights Reserved.</p>
+        <p>&copy; 2025 Vision AI小说平台 All Rights Reserved.</p>
       </div>
     </el-footer>
   </div>

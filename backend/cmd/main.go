@@ -85,6 +85,7 @@ func main() {
 		{
 			authorized.POST("", novelHandler.CreateNovel)
 			authorized.PUT("/:id", novelHandler.UpdateNovel)
+			authorized.PUT("/:id/status", novelHandler.UpdateNovelStatus)
 			authorized.DELETE("/:id", novelHandler.DeleteNovel)
 			authorized.GET("/author/me", novelHandler.ListAuthorNovels)
 			authorized.GET("/author/stats", novelHandler.GetAuthorStats)

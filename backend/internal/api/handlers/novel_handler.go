@@ -87,7 +87,36 @@ func (h *NovelHandler) UpdateNovel(c *gin.Context) {
 
 	c.JSON(http.StatusOK, novel)
 }
+func (h *NovelHandler) UpdateNovelStatus(c *gin.Context) {
+	novelId := c.Param("id")
+	var req struct {
+		Status int `json:"status"`
+	}
 
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	// 验证状态值是否有效
+	if req.Status < 0 || req.Status > 2 {
+		c.JSON(400, gin.H{"error": "Invalid status"})
+		return
+	}
+	userID := utils.GetUserIDFromContext(c)
+	// 更新数据库中的小说状态
+	uintNovelId, err := strconv.Atoi(novelId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid novel ID"})
+		return
+	}
+	if err := h.novelService.UpdateNovelStatus(uint(uintNovelId), req.Status, userID); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to update status"})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "Status updated successfully"})
+}
 func (h *NovelHandler) DeleteNovel(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -115,6 +144,9 @@ func (h *NovelHandler) ListNovels(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	for i := range novels {
+		novels[i].NovelOutline = nil
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -171,7 +203,7 @@ func (h *NovelHandler) GetNovelOutline(c *gin.Context) {
 			"code": 400,
 			"msg":  "Invalid novel ID",
 			"data": models.NovelOutline{
-				Outline: []models.OutlineItem{},
+				Outline:       []models.OutlineItem{},
 				WorldBuilding: models.WorldBuilding{},
 			},
 		})
@@ -185,7 +217,7 @@ func (h *NovelHandler) GetNovelOutline(c *gin.Context) {
 			"code": 500,
 			"msg":  err.Error(),
 			"data": models.NovelOutline{
-				Outline: []models.OutlineItem{},
+				Outline:       []models.OutlineItem{},
 				WorldBuilding: models.WorldBuilding{},
 			},
 		})
@@ -213,8 +245,8 @@ func (h *NovelHandler) UpdateNovelOutline(c *gin.Context) {
 	var outline models.NovelOutline
 	if err := c.ShouldBindJSON(&outline); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"code": 400,
-			"msg":  "Invalid outline data",
+			"code":  400,
+			"msg":   "Invalid outline data",
 			"error": err.Error(),
 		})
 		return
@@ -223,8 +255,8 @@ func (h *NovelHandler) UpdateNovelOutline(c *gin.Context) {
 	userID := utils.GetUserIDFromContext(c)
 	if err := h.novelService.UpdateNovelOutline(uint(novelID), userID, &outline); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"code": 500,
-			"msg":  "Failed to update outline",
+			"code":  500,
+			"msg":   "Failed to update outline",
 			"error": err.Error(),
 		})
 		return

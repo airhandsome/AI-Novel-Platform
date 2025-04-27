@@ -81,7 +81,24 @@ func (h *ChapterHandler) UpdateChapter(c *gin.Context) {
 		return
 	}
 
+	exist, err := h.chapterService.GetChapter(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Chapter not found"})
+		return
+	}
+
 	if err := h.chapterService.UpdateChapterContent(uint(id), updates.Title, updates.Content, updates.WordCount); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	novel, err := h.novelService.GetNovel(exist.NovelID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	novel.WordCount += updates.WordCount
+	if err := h.novelService.UpdateNovel(novel); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -181,4 +198,4 @@ func (h *ChapterHandler) UpdateChapterStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Chapter status updated successfully"})
-} 
+}

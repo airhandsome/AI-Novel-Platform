@@ -14,7 +14,7 @@ type OutlineItem struct {
 	ID          uint          `json:"id"`
 	Title       string        `json:"title"`       // 章节标题
 	Description string        `json:"description"` // 章节描述
-	Order       int          `json:"order"`       // 排序
+	Order       int           `json:"order"`       // 排序
 	Children    []OutlineItem `json:"children"`    // 子节点
 }
 
@@ -32,9 +32,9 @@ type Location struct {
 
 // WorldBuilding 世界观设定结构
 type WorldBuilding struct {
-	Background  string      `json:"background"`
-	Characters  []Character `json:"characters"`
-	Locations   []Location  `json:"locations"`
+	Background string      `json:"background"`
+	Characters []Character `json:"characters"`
+	Locations  []Location  `json:"locations"`
 }
 
 // NovelOutline 小说大纲完整结构
@@ -123,7 +123,7 @@ type Novel struct {
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `json:"-" gorm:"index"`
 	Tags          StringArray    `json:"tags" gorm:"type:json"`
-	NovelOutline  NovelOutline   `json:"novelOutline" gorm:"type:json"` // 小说大纲，包含世界观设定
+	NovelOutline  *NovelOutline  `json:"novelOutline" gorm:"type:json"` // 小说大纲，包含世界观设定
 }
 
 func (Novel) TableName() string {

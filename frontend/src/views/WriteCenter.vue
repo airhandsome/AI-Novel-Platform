@@ -42,9 +42,24 @@
                 <div class="novel-details">
                   <h3 class="title-large novel-title">{{ novel.title }}</h3>
                   <div class="novel-meta">
-                    <el-tag :type="getStatusType(novel.status)" class="status-tag" effect="light">
-                      {{ getStatusText(novel.status) }}
-                    </el-tag>
+                    <el-dropdown @command="(command) => updateNovelStatus(novel.id, command)">
+                      <el-tag :type="getStatusType(novel.status)" class="status-tag" effect="light">
+                        {{ getStatusText(novel.status) }}
+                        <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                      </el-tag>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item 
+                            v-for="option in STATUS_OPTIONS" 
+                            :key="option.value"
+                            :command="option.value"
+                            :disabled="novel.status === option.value"
+                          >
+                            {{ option.label }}
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
                     <span class="update-time">{{ getRelativeTime(novel.updateTime) }}</span>
                   </div>
                   <div class="novel-stats">
@@ -90,10 +105,7 @@
                       </el-dropdown-item>
                       <el-dropdown-item command="stats">
                         <el-icon><TrendCharts /></el-icon>数据统计
-                      </el-dropdown-item>
-                      <el-dropdown-item command="ai">
-                        <el-icon><Magic /></el-icon>AI优化建议
-                      </el-dropdown-item>
+                      </el-dropdown-item>                    
                       <el-dropdown-item command="delete" divided>
                         <el-icon><Delete /></el-icon>删除作品
                       </el-dropdown-item>
@@ -277,6 +289,13 @@ const aiInput = ref('')
 const isAiLoading = ref(false)
 const chatMessages = ref(null)
 
+// 状态选项
+const STATUS_OPTIONS = [
+  { value: 0, label: '连载中', type: 'primary' },
+  { value: 1, label: '已完结', type: 'success' },
+  { value: 2, label: '烂尾', type: 'danger' }
+]
+
 // 获取作品列表
 const fetchNovels = async () => {
   try {
@@ -343,20 +362,20 @@ const submitNovel = async () => {
 
 // 获取状态类型
 const getStatusType = (status) => {
-  const types = {
-    0: 'info',    // 草稿
-    1: 'success', // 连载中
-    2: 'warning'  // 已完结
+  const statusMap = {
+    0: 'primary',  // 连载中
+    1: 'success',  // 已完结
+    2: 'danger'    // 烂尾
   }
-  return types[status] || 'info'
+  return statusMap[status] || 'info'
 }
 
 // 获取状态文本
 const getStatusText = (status) => {
   const texts = {
-    0: '草稿',
-    1: '连载中',
-    2: '已完结'
+    0: '连载中',
+    1: '已完结',
+    2: '烂尾'
   }
   return texts[status] || '未知'
 }
@@ -500,6 +519,18 @@ const fetchNovelStats = async () => {
     totalFavorites.value = response.totalFavorites || 0
   } catch (error) {
     console.error('获取统计数据失败:', error)
+  }
+}
+
+// 添加修改状态的方法
+const updateNovelStatus = async (novelId, newStatus) => {
+  try {
+    await novelApi.updateNovelStatus(novelId, newStatus)
+    ElMessage.success('状态更新成功')
+    await fetchNovels() // 刷新列表
+  } catch (error) {
+    console.error('更新状态失败:', error)
+    ElMessage.error('更新状态失败')
   }
 }
 
@@ -649,8 +680,24 @@ onMounted(() => {
 }
 
 .status-tag {
-  border-radius: 20px;
-  padding: 4px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-tag:hover {
+  opacity: 0.8;
+}
+
+:deep(.el-dropdown-menu__item) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+:deep(.el-dropdown-menu__item.is-disabled) {
+  cursor: not-allowed;
 }
 
 .update-time {

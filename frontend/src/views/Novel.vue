@@ -85,21 +85,53 @@
         </div>
       </div>
 
-      <el-scrollbar height="500px" class="chapter-scrollbar">
-        <div class="chapter-grid">
-          <div
-            v-for="chapter in displayChapters"
-            :key="chapter.id"
-            class="chapter-item"
-            @click="goToChapter(chapter.id)"
-          >
-            <span class="chapter-title title-medium" :class="{ 'read': chapter.isRead }">
+      <div class="chapters-list">
+        <div v-for="chapter in chapters" :key="chapter.id" class="chapter-item">
+          <div class="chapter-info">
+            <div class="chapter-title">
               {{ chapter.title }}
-            </span>
-            <span class="chapter-word-count caption">{{ formatNumber(chapter.wordCount) }}字</span>
+            </div>
+            <div class="chapter-meta">
+              <span>{{ chapter.formattedWordCount }}</span>
+              <span>更新于: {{ chapter.updateTime }}</span>
+              <span :class="['chapter-status', chapter.statusClass]">
+                {{ chapter.statusText }}
+              </span>
+            </div>
+          </div>
+          <div class="chapter-actions">
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="handleReadChapter(chapter.id)"
+            >
+              阅读
+            </el-button>
+            <el-button 
+              v-if="isAuthor" 
+              type="warning" 
+              size="small" 
+              @click="handleEditChapter(chapter.id)"
+            >
+              编辑
+            </el-button>
           </div>
         </div>
-      </el-scrollbar>
+        
+        <!-- 空状态 -->
+        <el-empty 
+          v-if="chapters.length === 0" 
+          description="暂无章节" 
+          :image-size="200"
+        >
+          <template #image>
+            <img src="../../public/assets/empty-chapters.png" alt="暂无章节" style="width: 200px;" />
+          </template>
+          <el-button v-if="isAuthor" type="primary" @click="handleCreateChapter">
+            创建新章节
+          </el-button>
+        </el-empty>
+      </div>
 
       <!-- 分页器 -->
       <div class="pagination">
@@ -150,6 +182,7 @@ const fetchNovelDetail = async () => {
 // 获取章节列表
 const fetchChapters = async () => {
   try {
+    console.log(route.params.id)
     const { data } = await novelApi.getNovelChapters({
       novelId: route.params.id,
       page: currentPage.value,
@@ -157,11 +190,73 @@ const fetchChapters = async () => {
       keyword: searchKeyword.value,
       reverse: reverseOrder.value
     })
-    chapters.value = data.chapters
+    
+    // 处理章节数据
+    chapters.value = data.chapters.map(chapter => ({
+      ...chapter,
+      // 解码 HTML 实体
+      content: decodeHTMLEntities(chapter.content),
+      // 格式化时间
+      createdAt: formatDate(chapter.createdAt),
+      updateTime: formatDate(chapter.updateTime),
+      // 格式化字数
+      formattedWordCount: formatWordCount(chapter.wordCount),
+      // 状态文本和样式
+      statusText: getStatusText(chapter.status),
+      statusClass: getStatusClass(chapter.status)
+    }))
+    
     totalChapters.value = data.total
   } catch (error) {
     ElMessage.error('获取章节列表失败')
   }
+}
+
+// HTML 实体解码函数
+const decodeHTMLEntities = (text) => {
+  const textarea = document.createElement('textarea')
+  textarea.innerHTML = text
+  return textarea.value
+}
+
+// 格式化日期
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 格式化字数
+const formatWordCount = (count) => {
+  if (count >= 10000) {
+    return (count / 10000).toFixed(1) + '万字'
+  } else if (count >= 1000) {
+    return (count / 1000).toFixed(1) + '千字'
+  }
+  return count + '字'
+}
+
+// 获取状态文本
+const getStatusText = (status) => {
+  const statusMap = {
+    0: '草稿',
+    1: '已发布'
+  }
+  return statusMap[status] || '未知'
+}
+
+// 获取状态样式类名
+const getStatusClass = (status) => {
+  const classMap = {
+    0: 'status-draft',
+    1: 'status-published'
+  }
+  return classMap[status] || 'status-unknown'
 }
 
 // 过滤显示的章节
@@ -397,49 +492,79 @@ onMounted(() => {
   background: var(--system-background);
 }
 
-.chapter-scrollbar :deep(.el-scrollbar__view) {
-  padding: 4px;
-}
-
-.chapter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+.chapters-list {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
 }
 
 .chapter-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  background: var(--system-background);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border-color);
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.chapter-item:last-child {
+  border-bottom: none;
 }
 
 .chapter-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border-color: var(--apple-blue);
+  background: rgba(46, 125, 50, 0.05);
+}
+
+.chapter-info {
+  flex: 1;
+  margin-right: 24px;
 }
 
 .chapter-title {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 1.1rem;
+  font-weight: 500;
   color: var(--text-primary);
+  margin-bottom: 8px;
 }
 
-.chapter-title.read {
-  color: var(--text-tertiary);
+.chapter-meta {
+  display: flex;
+  gap: 24px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  align-items: center;
 }
 
-.chapter-word-count {
-  color: var(--text-tertiary);
-  margin-left: 12px;
+.chapter-status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-draft {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.status-published {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-unknown {
+  background: #f5f5f5;
+  color: #757575;
+}
+
+.chapter-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.chapter-actions .el-button {
+  min-width: 80px;
 }
 
 .pagination {
@@ -464,6 +589,30 @@ onMounted(() => {
 
   .novel-cover {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@media (max-width: 768px) {
+  .chapter-item {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  .chapter-info {
+    margin-right: 0;
+    margin-bottom: 16px;
+    width: 100%;
+  }
+
+  .chapter-meta {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .chapter-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 </style>

@@ -31,6 +31,14 @@ func (s *NovelService) UpdateNovel(novel *models.Novel) error {
 	return s.db.Save(novel).Error
 }
 
+func (s *NovelService) UpdateNovelStatus(id uint, status int, authorID uint) error {
+	result := s.db.Model(&models.Novel{}).Where("id = ? AND author_id = ?", id, authorID).Update("status", status)
+	if result.RowsAffected == 0 {
+		return errors.New("novel not found or not authorized")
+	}
+	return result.Error
+}
+
 func (s *NovelService) DeleteNovel(id uint, authorID uint) error {
 	result := s.db.Where("id = ? AND author_id = ?", id, authorID).Delete(&models.Novel{})
 	if result.RowsAffected == 0 {
@@ -45,7 +53,7 @@ func (s *NovelService) ListNovels(page, pageSize int, category string, status in
 
 	query := s.db.Model(&models.Novel{}).Preload("Author")
 
-	if category != "" {
+	if category != "" && category != "all" {
 		query = query.Where("category = ?", category)
 	}
 	if status != -1 {
@@ -142,15 +150,15 @@ func (s *NovelService) GetNovelOutline(novelID uint, authorID uint) (*models.Nov
 			return &models.NovelOutline{
 				Outline: []models.OutlineItem{},
 				WorldBuilding: models.WorldBuilding{
-					Background:  "",
-					Characters:  []models.Character{},
+					Background: "",
+					Characters: []models.Character{},
 					Locations:  []models.Location{},
 				},
 			}, nil
 		}
 		return nil, err
 	}
-	
+
 	if novel.NovelOutline.Outline == nil {
 		novel.NovelOutline.Outline = []models.OutlineItem{}
 	}
@@ -160,8 +168,8 @@ func (s *NovelService) GetNovelOutline(novelID uint, authorID uint) (*models.Nov
 	if novel.NovelOutline.WorldBuilding.Locations == nil {
 		novel.NovelOutline.WorldBuilding.Locations = []models.Location{}
 	}
-	
-	return &novel.NovelOutline, nil
+
+	return novel.NovelOutline, nil
 }
 
 // UpdateNovelOutline 更新小说大纲
@@ -180,7 +188,7 @@ func (s *NovelService) UpdateNovelOutline(novelID uint, authorID uint, outline *
 	result := s.db.Model(&models.Novel{}).
 		Where("id = ? AND author_id = ?", novelID, authorID).
 		Update("novel_outline", outline)
-	
+
 	if result.RowsAffected == 0 {
 		return errors.New("novel not found or not authorized")
 	}

@@ -6,10 +6,12 @@ export const novelApi = {
   getNovels(params) {
     return request.get('/novels', { params })
   },
-
+  getNovelList(params) {
+    return request.get('/v1/novels', { params })
+  },
   // 获取小说详情
   getNovelDetail(id) {
-    return request.get(`/novels/${id}`)
+    return request.get(`/v1/novels/${id}`)
   },
 
   // 获取作者的小说列表
@@ -33,8 +35,8 @@ export const novelApi = {
   },
 
   // 获取小说章节列表
-  getNovelChapters(novelId) {
-    return request.get(`/v1/chapters/novel/${novelId}`)
+  getNovelChapters(params) {
+    return request.get(`/v1/chapters/novel/${params.novelId}`, { params })
   },
 
   getNovel(novelId) {
@@ -125,5 +127,11 @@ export const novelApi = {
   // 更新小说大纲
   updateNovelOutline(novelId, data) {
     return request.put(`/v1/novels/${novelId}/outline`, data)
+  },
+
+  // 更新小说状态
+  updateNovelStatus: async (novelId, status) => {
+    const response = await request.put(`/v1/novels/${novelId}/status`, { status })
+    return response.data
   }
 }
