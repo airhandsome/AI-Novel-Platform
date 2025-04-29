@@ -67,12 +67,12 @@
       </div>
     </div>
 
-    <!-- 保存提示 -->
+    <!-- 保存提示
     <transition name="fade">
       <div v-if="showSaveStatus" class="save-status" :class="{ 'success': saveSuccess }">
         {{ saveStatusText }}
       </div>
-    </transition>
+    </transition> -->
 
     <!-- AI助手对话框 -->
     <el-dialog 
@@ -146,7 +146,7 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
+import { ref, shallowRef, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { 
@@ -238,7 +238,7 @@ const showSaveStatus = (message, success = true) => {
   showSaveStatus.value = true
   setTimeout(() => {
     showSaveStatus.value = false
-  }, 3000)
+  }, 6000)
 }
 
 // 自动保存状态提示
@@ -286,14 +286,31 @@ const saveChapter = async () => {
 
 // 自动保存
 const startAutoSave = () => {
-  if (autoSaveInterval) return
+  if (autoSaveInterval) {
+    clearInterval(autoSaveInterval)
+  }
   
   autoSaveInterval = setInterval(() => {
-    if (autoSave.value && content.value.trim()) {
+    if (autoSave.value && content.value?.trim()) {
       saveChapter()
     }
-  }, 60000)
+  }, 60000) // 改为60秒
 }
+
+// 监听自动保存开关变化
+watch(autoSave, (newValue) => {
+  if (newValue) {
+    startAutoSave()
+  } else {
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval)
+      autoSaveInterval = null
+    }
+  }
+})
+
+
+
 
 // 加载章节内容
 const loadChapter = async () => {
