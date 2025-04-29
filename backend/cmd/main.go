@@ -22,7 +22,7 @@ func main() {
 	//db.Migrator().DropTable(&models.Novel{}, &models.User{}, &models.Favorite{}, &models.Chapter{})
 
 	// 自动迁移数据库表
-	if err := db.AutoMigrate(&models.User{}, &models.Novel{}, &models.Favorite{}, &models.Chapter{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.Novel{}, &models.Favorite{}, &models.Chapter{}, &models.ReadProgress{}); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
@@ -41,8 +41,23 @@ func main() {
 	// 初始化Gin
 	r := gin.Default()
 
-	// 使用 gin-cors 中间件
-	r.Use(middleware.CORS())
+	// 使用 CORS 中间件
+	r.Use(func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+		if origin == "http://localhost:5173" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+			c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+			c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length, Content-Range")
+
+			if c.Request.Method == "OPTIONS" {
+				c.AbortWithStatus(204)
+				return
+			}
+		}
+		c.Next()
+	})
 
 	// 初始化服务和处理器
 	userService := service.NewUserService(db)
@@ -51,6 +66,8 @@ func main() {
 	novelHandler := handlers.NewNovelHandler(novelService)
 	chapterService := service.NewChapterService(db)
 	chapterHandler := handlers.NewChapterHandler(chapterService, novelService)
+	readProgressService := service.NewReadProgressService(db)
+	readProgressHandler := handlers.NewReadProgressHandler(readProgressService)
 
 	// 用户相关路由
 	auth := r.Group("/api/v1/auth")
@@ -91,6 +108,10 @@ func main() {
 			authorized.GET("/author/stats", novelHandler.GetAuthorStats)
 			authorized.GET("/:id/outline", novelHandler.GetNovelOutline)
 			authorized.PUT("/:id/outline", novelHandler.UpdateNovelOutline)
+			authorized.GET("/favorite/:id", novelHandler.CheckFavorite)
+			authorized.POST("/favorite/:id", novelHandler.FavoriteNovel)
+			authorized.DELETE("/favorite/:id", novelHandler.UnfavoriteNovel)
+			authorized.GET("/favorites", novelHandler.GetFavorites)
 		}
 	}
 
@@ -105,6 +126,14 @@ func main() {
 		chapters.PUT("/:id/move", chapterHandler.MoveChapter)
 		chapters.GET("/novel/:novelId", chapterHandler.ListNovelChapters)
 		chapters.PUT("/:id/status", chapterHandler.UpdateChapterStatus)
+	}
+
+	// 阅读进度相关路由
+	progress := r.Group("/api/v1/reading-progress")
+	progress.Use(middleware.JWTAuth())
+	{
+		progress.POST("", readProgressHandler.UpdateReadProgress)
+		progress.GET("/novel/:novelId", readProgressHandler.GetReadProgress)
 	}
 
 	// 启动服务器

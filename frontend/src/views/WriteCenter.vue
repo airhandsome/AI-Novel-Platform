@@ -36,7 +36,7 @@
             <div v-for="novel in novels" :key="novel.id" class="novel-card">
               <div class="novel-info">
                 <div class="cover-wrapper">
-                  <img :src="novel.coverUrl || '/default-cover.jpg'" class="novel-cover" />
+                  <img :src="novel.coverUrl || '../../public/assets/default-cover.png'" class="novel-cover" />
                   <div class="cover-overlay"></div>
                 </div>
                 <div class="novel-details">
@@ -316,7 +316,7 @@ const fetchNovels = async () => {
     // Transform the novels data to handle any missing or null values
     novels.value = response.novels.map(novel => ({
       ...novel,
-      coverUrl: novel.coverUrl || '/default-cover.jpg',
+      coverUrl: novel.coverUrl || '../../public/assets/default-cover.png',
       wordCount: novel.wordCount || 0,
       readCount: novel.readCount || 0,
       favoriteCount: novel.favoriteCount || 0,

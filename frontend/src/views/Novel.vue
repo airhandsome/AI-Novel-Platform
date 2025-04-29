@@ -4,7 +4,7 @@
     <div class="novel-header glass-effect">
       <div class="novel-info">
         <div class="cover-wrapper">
-          <img :src="novel.coverUrl || '/default-cover.jpg'" class="novel-cover" />
+          <img :src="novel.coverUrl || '../../public/assets/default-cover.png'" class="novel-cover" />
           <div class="cover-overlay"></div>
         </div>
         <div class="novel-meta">
@@ -42,13 +42,13 @@
               开始阅读
             </el-button>
             <el-button 
-              :type="novel.isFavorited ? 'success' : ''" 
+              :type="isFavorited ? 'success' : ''" 
               size="large"
               class="action-button"
               @click="toggleFavorite"
             >
               <el-icon><Star /></el-icon>
-              {{ novel.isFavorited ? '已收藏' : '收藏' }}
+              {{ isFavorited ? '已收藏' : '收藏' }}
             </el-button>
           </div>
         </div>
@@ -86,7 +86,7 @@
       </div>
 
       <div class="chapters-list">
-        <div v-for="chapter in chapters" :key="chapter.id" class="chapter-item">
+        <div v-for="chapter in displayChapters" :key="chapter.id" class="chapter-item">
           <div class="chapter-info">
             <div class="chapter-title">
               {{ chapter.title }}
@@ -120,12 +120,12 @@
         
         <!-- 空状态 -->
         <el-empty 
-          v-if="chapters.length === 0" 
+          v-if="displayChapters.length === 0" 
           description="暂无章节" 
           :image-size="200"
         >
           <template #image>
-            <img src="../../public/assets/empty-chapters.png" alt="暂无章节" style="width: 200px;" />
+            <img src="../../public/assets/empty-chapter.png" alt="暂无章节" style="width: 200px;" />
           </template>
           <el-button v-if="isAuthor" type="primary" @click="handleCreateChapter">
             创建新章节
@@ -140,8 +140,8 @@
           v-model:page-size="pageSize"
           :page-sizes="[20, 50, 100]"
           :total="totalChapters"
-          layout="total, sizes, prev, pager, next, jumper"
-          background
+          :layout="'total, sizes, prev, pager, next, jumper'"
+          :background="true"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
@@ -156,9 +156,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Document, View, Star, Search } from '@element-plus/icons-vue'
 import { novelApi } from '../api/novel'
+import { useUserStore } from '../stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 // 小说信息
 const novel = ref({})
@@ -168,12 +170,27 @@ const pageSize = ref(20)
 const totalChapters = ref(0)
 const searchKeyword = ref('')
 const reverseOrder = ref(false)
+const isFavorited = ref(false)
+
+// 检查当前用户是否是作者
+const isAuthor = computed(() => {
+  return userStore.user?.id === novel.value.authorId
+})
 
 // 获取小说信息
 const fetchNovelDetail = async () => {
   try {
-    const { data } = await novelApi.getNovelDetail(route.params.id)
+    const data = await novelApi.getNovelDetail(route.params.id)
     novel.value = data
+    
+    // 检查是否已收藏
+    try {
+      const response = await novelApi.checkFavorite(route.params.id)
+      isFavorited.value = response.message === 'true'
+    } catch (error) {
+      console.error('获取收藏状态失败:', error)
+      isFavorited.value = false
+    }
   } catch (error) {
     ElMessage.error('获取小说信息失败')
   }
@@ -182,8 +199,7 @@ const fetchNovelDetail = async () => {
 // 获取章节列表
 const fetchChapters = async () => {
   try {
-    console.log(route.params.id)
-    const { data } = await novelApi.getNovelChapters({
+    const data  = await novelApi.getNovelChapters({
       novelId: route.params.id,
       page: currentPage.value,
       limit: pageSize.value,
@@ -261,7 +277,23 @@ const getStatusClass = (status) => {
 
 // 过滤显示的章节
 const displayChapters = computed(() => {
-  return chapters.value
+  let filtered = chapters.value
+  
+  // 搜索过滤
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    filtered = filtered.filter(chapter => 
+      chapter.title.toLowerCase().includes(keyword) ||
+      chapter.content.toLowerCase().includes(keyword)
+    )
+  }
+  
+  // 排序
+  if (reverseOrder.value) {
+    filtered = [...filtered].reverse()
+  }
+  
+  return filtered
 })
 
 // 格式化数字
@@ -283,20 +315,22 @@ const startReading = () => {
 
 // 跳转到章节
 const goToChapter = (chapterId) => {
-  router.push(`/novel/${route.params.id}/chapter/${chapterId}`)
+  router.push(`/novels/${route.params.id}/chapter/${chapterId}`)
 }
 
 // 收藏/取消收藏
 const toggleFavorite = async () => {
   try {
-    if (novel.value.isFavorited) {
+    if (isFavorited.value) {
       await novelApi.unfavoriteNovel(route.params.id)
       ElMessage.success('已取消收藏')
+      novel.value.favoriteCount--
     } else {
       await novelApi.favoriteNovel(route.params.id)
       ElMessage.success('收藏成功')
+      novel.value.favoriteCount++
     }
-    novel.value.isFavorited = !novel.value.isFavorited
+    isFavorited.value = !isFavorited.value
   } catch (error) {
     ElMessage.error('操作失败')
   }
@@ -322,6 +356,21 @@ const handleSizeChange = (size) => {
 const handleCurrentChange = (page) => {
   currentPage.value = page
   fetchChapters()
+}
+
+// 创建新章节
+const handleCreateChapter = () => {
+  router.push(`/novels/${route.params.id}/chapter/create`)
+}
+
+// 加载指定章节
+const handleReadChapter = (chapterId) => {
+  goToChapter(chapterId)
+}
+
+// 编辑章节
+const handleEditChapter = (chapterId) => {
+  router.push(`/novels/${route.params.id}/chapter/${chapterId}/edit`)
 }
 
 onMounted(() => {
@@ -590,6 +639,10 @@ onMounted(() => {
   .novel-cover {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   }
+
+  .search-input :deep(.el-input__wrapper) {
+    background: var(--system-grouped-primary);
+  }
 }
 
 @media (max-width: 768px) {
@@ -613,6 +666,55 @@ onMounted(() => {
   .chapter-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .chapter-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+}
+
+/* 添加收藏按钮样式 */
+.novel-actions .el-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.novel-actions .el-button:hover {
+  transform: translateY(-2px);
+}
+
+.novel-actions .el-button:active {
+  transform: translateY(0);
+}
+
+.novel-actions .el-button[type="success"] {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.novel-actions .el-button[type="success"]:hover {
+  background: var(--dark);
+  border-color: var(--dark);
+}
+
+/* 暗色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .novel-actions .el-button[type="success"] {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+
+  .novel-actions .el-button[type="success"]:hover {
+    background: var(--dark);
+    border-color: var(--dark);
   }
 }
 </style>

@@ -2,11 +2,13 @@
 import axios from 'axios'
 import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
+import router from '../router'
 
 // 创建 axios 实例
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: 'http://localhost:8080/api',
   timeout: 15000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -29,24 +31,19 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   (response) => {
-    const res = response.data
-    if (res.code && res.code !== 200) {
-      ElMessage.error(res.message || '请求失败')
-      return Promise.reject(new Error(res.message || '请求失败'))
-    }
-    return res
+    return response.data
   },
   (error) => {
     if (error.response) {
       switch (error.response.status) {
         case 401:
-          // 未授权，跳转到登录页
+          ElMessage.error('未授权，请重新登录')
           const userStore = useUserStore()
           userStore.logout()
           router.push('/login')
           break
         case 403:
-          ElMessage.error('没有权限进行此操作')
+          ElMessage.error('拒绝访问')
           break
         case 404:
           ElMessage.error('请求的资源不存在')

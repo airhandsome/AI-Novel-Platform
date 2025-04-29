@@ -202,7 +202,7 @@ const loadBooks = async () => {
       title: novel.title,
       description: novel.description,
       author: novel.author.Username,
-      cover: novel.coverUrl || '/default-cover.jpg',
+      cover: novel.coverUrl || '../../public/assets/default-cover.png',
       status: novel.status,
       readCount: novel.readCount,
       favoriteCount: novel.favoriteCount,

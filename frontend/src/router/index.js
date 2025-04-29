@@ -9,12 +9,7 @@ const routes = [
         path: '',
         name: 'Home',
         component: () => import('../views/Home.vue')
-      },
-      {
-        path: 'novels',
-        name: 'Novels',
-        component: () => import('../views/NovelSquare.vue')
-      },
+      },     
       {
         path: 'novels/:id',
         name: 'Novel',
@@ -99,6 +94,29 @@ const routes = [
     meta: {
       title: '排行榜'
     }
+  },
+  // {
+  //   path: '/novels/create',
+  //   name: 'novel-create',
+  //   component: () => import('../views/NovelCreate.vue'),
+  //   meta: { requiresAuth: true }
+  // },
+  // {
+  //   path: '/novels/:id/chapter/create',
+  //   name: 'chapter-create',
+  //   component: () => import('../views/ChapterCreate.vue'),
+  //   meta: { requiresAuth: true }
+  // },
+  {
+    path: '/novels/:id/chapter/:chapterId',
+    name: 'chapter-reader',
+    component: () => import('../views/ChapterReader.vue')
+  // },
+  // {
+  //   path: '/novels/:id/chapter/:chapterId/edit',
+  //   name: 'chapter-edit',
+  //   component: () => import('../views/ChapterEdit.vue'),
+  //   meta: { requiresAuth: true }
   }
 ]
 

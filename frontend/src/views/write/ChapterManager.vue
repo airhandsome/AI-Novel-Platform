@@ -90,7 +90,7 @@ const previewChapterData = ref({})
 // 获取章节列表
 const fetchChapters = async () => {
   try {
-    const response = await novelApi.getNovelChapters(novelId)
+    const response = await novelApi.getNovelChapters({novelId: novelId})
     // 从response中获取chapters数组
     chapters.value = response.chapters || []
   } catch (error) {

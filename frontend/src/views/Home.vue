@@ -8,7 +8,9 @@
             <div class="banner-text glass-effect">
               <h2 class="display-large">{{ item.title }}</h2>
               <p class="title-medium">{{ item.description }}</p>
-              <el-button type="primary" size="large" class="banner-button">立即探索</el-button>
+              <el-button type="primary" size="large" class="banner-button" @click="navigateToSection(item.action)">
+                {{ item.buttonText }}
+              </el-button>
             </div>
           </div>
         </el-carousel-item>
@@ -18,20 +20,24 @@
     <!-- 内容区域 -->
     <div class="content">
       <!-- 推荐小说 -->
-      <section class="section">
+      <section class="section card-container" v-loading="loading.recommended">
         <div class="section-header">
           <h2 class="display-small">编辑推荐</h2>
-          <el-button text class="title-medium">查看更多</el-button>
+          <el-button text class="title-medium" @click="$router.push('/library')">查看更多</el-button>
         </div>
-        <el-row :gutter="24">
+        <el-empty v-if="recommendedBooks.length === 0 && !loading.recommended" description="暂无推荐小说" />
+        <el-row :gutter="24" v-else>
           <el-col :span="4" v-for="book in recommendedBooks" :key="book.id">
-            <div class="book-card shadow-md" @click="$router.push(`/novel/${book.id}`)">
+            <div class="book-card shadow-md" @click="$router.push(`/novels/${book.id}`)">
               <div class="book-cover">
-                <img :src="book.cover" :alt="book.title" />
+                <img :src="book.cover || '/default-cover.jpg'" :alt="book.title" />
+                <div class="book-overlay">
+                  <el-button circle icon="Plus" class="add-button" @click.stop="addToFavorite(book.id)" />
+                </div>
               </div>
               <div class="book-info">
                 <h3 class="title-medium">{{ book.title }}</h3>
-                <p class="body-medium author">{{ book.author }}</p>
+                <p class="body-medium author">✍️ {{ book.author }}</p>
                 <p class="caption description">{{ book.description }}</p>
               </div>
             </div>
@@ -40,32 +46,33 @@
       </section>
 
       <!-- 最新更新 -->
-      <section class="section">
+      <section class="section card-container" v-loading="loading.latestUpdates">
         <div class="section-header">
           <h2 class="display-small">最新更新</h2>
-          <el-button text class="title-medium">查看更多</el-button>
+          <el-button text class="title-medium" @click="$router.push('/library?sort=latest')">查看更多</el-button>
         </div>
-        <div class="latest-updates">
+        <el-empty v-if="latestUpdates.length === 0 && !loading.latestUpdates" description="暂无最新更新" />
+        <div class="latest-updates" v-else>
           <div v-for="update in latestUpdates" :key="update.id" class="update-item">
             <div class="book-meta">
-              <router-link :to="`/novel/${update.id}`" class="book-title title-medium">
+              <router-link :to="`/novels/${update.id}`" class="book-title title-medium">
                 {{ update.title }}
               </router-link>
-              <span class="author body-medium">{{ update.author }}</span>
+              <span class="author body-medium">✍️ {{ update.author }}</span>
             </div>
             <router-link 
-              :to="`/novel/${update.id}/chapter/${update.latestChapterId}`" 
+              :to="`/novels/${update.id}/chapter/${update.latestChapterId}`" 
               class="chapter-link body-medium"
             >
               {{ update.latestChapter }}
             </router-link>
-            <span class="update-time caption">{{ update.updateTime }}</span>
+            <span class="update-time caption">{{ formatDate(update.updateTime) }}</span>
           </div>
         </div>
       </section>
 
       <!-- AI创作专区 -->
-      <section class="section ai-section">
+      <section class="section ai-section card-container">
         <div class="section-header">
           <h2 class="display-small">AI创作专区</h2>
           <el-button type="primary" size="large" @click="$router.push('/write')">开始创作</el-button>
@@ -89,70 +96,55 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Edit, Brush, Tools } from '@element-plus/icons-vue'
+import { novelApi } from '../api/novel'
+import { ElMessage } from 'element-plus'
+import { useUserStore } from '../stores/user'
 
-// 模拟数据 - 轮播图
+const router = useRouter()
+const userStore = useUserStore()
+
+// 加载状态
+const loading = ref({
+  recommended: false,
+  latestUpdates: false
+})
+
+// 轮播图数据
 const banners = ref([
   {
     id: 1,
     image: '/banner1.jpg',
     title: '发现优质小说',
-    description: '数千部精选小说，总有一本适合你'
+    description: '数千部精选小说，总有一本适合你',
+    buttonText: '立即探索',
+    action: 'library'
   },
   {
     id: 2,
     image: '/banner2.jpg',
     title: 'AI智能创作',
-    description: '让创作更简单，让故事更精彩'
+    description: '让创作更简单，让故事更精彩',
+    buttonText: '开始创作',
+    action: 'write'
   },
   {
     id: 3,
     image: '/banner3.jpg',
     title: '作者社区',
-    description: '和其他作者交流，分享创作经验'
+    description: '和其他作者交流，分享创作经验',
+    buttonText: '加入社区',
+    action: 'community'
   }
 ])
 
-// 模拟数据 - 推荐小说
-const recommendedBooks = ref([
-  {
-    id: 1,
-    title: '星际迷航',
-    author: '张三',
-    cover: '/book1.jpg',
-    description: '一部精彩的科幻小说'
-  },
-  {
-    id: 2,
-    title: '魔法世界',
-    author: '李四',
-    cover: '/book2.jpg',
-    description: '奇幻冒险故事'
-  },
-  // ... 更多书籍
-])
+// 推荐小说数据
+const recommendedBooks = ref([])
 
-// 模拟数据 - 最新更新
-const latestUpdates = ref([
-  {
-    id: 1,
-    title: '星际迷航',
-    author: '张三',
-    latestChapter: '第100章 惊天大战',
-    latestChapterId: 100,
-    updateTime: '2024-01-20 15:30'
-  },
-  {
-    id: 2,
-    title: '魔法世界',
-    author: '李四',
-    latestChapter: '第80章 魔法觉醒',
-    latestChapterId: 80,
-    updateTime: '2024-01-20 14:20'
-  },
-  // ... 更多更新
-])
+// 最新更新数据
+const latestUpdates = ref([])
 
 // AI功能特性
 const aiFeatures = ref([
@@ -175,12 +167,146 @@ const aiFeatures = ref([
     description: '生成丰富的场景描写，让故事更加生动'
   }
 ])
+
+// 导航到不同区域
+const navigateToSection = (action) => {
+  switch (action) {
+    case 'library':
+      router.push('/library')
+      break
+    case 'write':
+      router.push('/write')
+      break
+    case 'community':
+      router.push('/community')
+      break
+    default:
+      router.push('/library')
+  }
+}
+
+// 加载推荐小说
+const loadRecommendedBooks = async () => {
+  try {
+    loading.value.recommended = true
+    const response = await novelApi.getNovelList({
+      page: 1,
+      pageSize: 6,
+      sortBy: 'recommend'
+    })
+    
+    recommendedBooks.value = response.novels.map(novel => ({
+      id: novel.id,
+      title: novel.title,
+      description: novel.description,
+      author: novel.author.Username,
+      cover: novel.coverUrl || '/default-cover.jpg',
+      status: novel.status
+    }))
+  } catch (error) {
+    console.error('加载推荐小说失败:', error)
+    ElMessage.error('加载推荐小说失败')
+  } finally {
+    loading.value.recommended = false
+  }
+}
+
+// 加载最新更新
+const loadLatestUpdates = async () => {
+  try {
+    loading.value.latestUpdates = true
+    const response = await novelApi.getNovelList({
+      page: 1,
+      pageSize: 5,
+      sortBy: 'latest'
+    })
+    
+    latestUpdates.value = response.novels.map(novel => ({
+      id: novel.id,
+      title: novel.title,
+      author: novel.author.Username,
+      latestChapter: novel.latestChapter?.title || '暂无章节',
+      latestChapterId: novel.latestChapter?.id || 0,
+      updateTime: novel.updateTime || novel.createTime
+    }))
+  } catch (error) {
+    console.error('加载最新更新失败:', error)
+    ElMessage.error('加载最新更新失败')
+  } finally {
+    loading.value.latestUpdates = false
+  }
+}
+
+// 添加到收藏
+const addToFavorite = async (novelId) => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+
+  try {
+    await novelApi.favoriteNovel(novelId)
+    ElMessage.success('已添加到收藏')
+  } catch (error) {
+    console.error('添加收藏失败:', error)
+    ElMessage.error('添加收藏失败')
+  }
+}
+
+// 格式化日期
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  
+  const date = new Date(dateString)
+  const now = new Date()
+  const diff = now - date
+  
+  // 一天内
+  if (diff < 24 * 60 * 60 * 1000) {
+    const hours = Math.floor(diff / (60 * 60 * 1000))
+    if (hours < 1) {
+      const minutes = Math.floor(diff / (60 * 1000))
+      return minutes <= 0 ? '刚刚' : `${minutes}分钟前`
+    }
+    return `${hours}小时前`
+  }
+  
+  // 一周内
+  if (diff < 7 * 24 * 60 * 60 * 1000) {
+    const days = Math.floor(diff / (24 * 60 * 60 * 1000))
+    return `${days}天前`
+  }
+  
+  // 一年内
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${date.getMonth() + 1}月${date.getDate()}日`
+  }
+  
+  // 超过一年
+  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`
+}
+
+onMounted(() => {
+  loadRecommendedBooks()
+  loadLatestUpdates()
+})
 </script>
 
 <style scoped>
+/* 使用Library.vue中相同的根变量 */
+:root {
+  --primary: #2e7d32;
+  --secondary: #81c784;
+  --light: #f1f8e9;
+  --dark: #1b5e20;
+  --border: #c8e6c9;
+  --code-bg: #e8f5e9;
+}
+
 .home {
   min-height: 100vh;
-  background: var(--system-background);
+  background-color: #f9f9f9;
 }
 
 .banner {
@@ -205,7 +331,7 @@ const aiFeatures = ref([
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.6), transparent);
+  background: linear-gradient(to right, rgba(46, 125, 50, 0.8), rgba(27, 94, 32, 0.6));
 }
 
 .banner-text {
@@ -214,6 +340,10 @@ const aiFeatures = ref([
   padding: 40px;
   border-radius: 24px;
   color: white;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
 .banner-text h2 {
@@ -228,6 +358,17 @@ const aiFeatures = ref([
 .banner-button {
   font-weight: 600;
   padding: 12px 32px;
+  background: var(--primary);
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(27, 94, 32, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.banner-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(27, 94, 32, 0.4);
+  background: var(--dark);
 }
 
 .content {
@@ -240,52 +381,64 @@ const aiFeatures = ref([
   margin-bottom: 60px;
 }
 
+.card-container {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(46, 125, 50, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  opacity: 0.8;
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(46, 125, 50, 0.1);
 }
 
 .section-header h2 {
-  color: var(--text-primary);
+  color: var(--dark);
   margin: 0;
+  font-weight: 600;
+}
+
+.section-header .el-button {
+  color: var(--primary);
 }
 
 .book-card {
-  background: var(--system-grouped-secondary);
-  border-radius: 16px;
+  background: white;
+  border-radius: 12px;
   overflow: hidden;
   margin-bottom: 24px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+  border: 1px solid #e0e0e0;
   position: relative;
   height: 380px;
   display: flex;
   flex-direction: column;
 }
 
-.book-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 16px;
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    transparent 70%,
-    rgba(0, 0, 0, 0.05) 100%
-  );
-  pointer-events: none;
-}
-
 .book-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.05),
-    0 12px 25px rgba(0, 0, 0, 0.07);
-  border-color: var(--apple-blue);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(46, 125, 50, 0.15);
+  border-color: var(--primary);
 }
 
 .book-cover {
@@ -310,11 +463,37 @@ const aiFeatures = ref([
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.5s ease;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .book-card:hover .book-cover img {
-  transform: scale(1.05);
+  transform: scale(1.08);
+}
+
+.book-overlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 2;
+}
+
+.book-card:hover .book-overlay {
+  opacity: 1;
+}
+
+.add-button {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  color: var(--primary);
+  border: none;
+}
+
+.add-button:hover {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.1);
 }
 
 .book-info {
@@ -332,12 +511,14 @@ const aiFeatures = ref([
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-size: 1.25rem;
 }
 
 .author {
   color: var(--text-secondary);
   margin-bottom: 8px;
   flex-shrink: 0;
+  font-size: 0.95rem;
 }
 
 .description {
@@ -349,15 +530,15 @@ const aiFeatures = ref([
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   flex-grow: 1;
-  font-size: 13px;
+  font-size: 0.9rem;
   line-height: 1.5;
 }
 
 .latest-updates {
-  background: var(--system-grouped-secondary);
-  border-radius: 16px;
+  background: white;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--border-color);
+  border: 1px solid #e0e0e0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
@@ -366,17 +547,10 @@ const aiFeatures = ref([
   align-items: center;
   padding: 20px;
   gap: 24px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(46, 125, 50, 0.1);
   transition: all 0.3s ease;
   position: relative;
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    transparent 50%,
-    var(--system-background) 100%
-  );
-  background-size: 200% 100%;
-  background-position: 0% 0%;
+  background: white;
 }
 
 .update-item:last-child {
@@ -384,7 +558,7 @@ const aiFeatures = ref([
 }
 
 .update-item:hover {
-  background-position: 100% 0%;
+  background-color: #f8fffa;
   padding-left: 24px;
 }
 
@@ -395,7 +569,7 @@ const aiFeatures = ref([
   top: 0;
   bottom: 0;
   width: 3px;
-  background: var(--apple-blue);
+  background: var(--primary);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -414,30 +588,34 @@ const aiFeatures = ref([
 .book-title {
   color: var(--text-primary);
   text-decoration: none;
+  transition: color 0.3s;
+  font-weight: 500;
 }
 
 .book-title:hover {
-  color: var(--apple-blue);
-}
-
-.author {
-  color: var(--text-secondary);
+  color: var(--primary);
 }
 
 .chapter-link {
   flex: 1;
   color: var(--text-primary);
   text-decoration: none;
+  transition: color 0.3s;
 }
 
 .chapter-link:hover {
-  color: var(--apple-blue);
+  color: var(--primary);
 }
 
 .update-time {
   color: var(--text-tertiary);
-  width: 120px;
+  min-width: 120px;
   text-align: right;
+  background: #f8f9fa;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  border: 1px solid rgba(46, 125, 50, 0.1);
 }
 
 .ai-section {
@@ -446,51 +624,25 @@ const aiFeatures = ref([
 
 .feature-card {
   padding: 40px;
-  border-radius: 24px;
+  border-radius: 16px;
   text-align: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border-color);
-  background: linear-gradient(
-    145deg,
-    var(--system-grouped-secondary) 0%,
-    var(--system-background) 100%
-  );
+  transition: all 0.3s ease;
+  border: 1px solid #e0e0e0;
+  background: white;
   position: relative;
   overflow: hidden;
-}
-
-.feature-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--apple-blue),
-    transparent
-  );
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  border-top: 3px solid var(--primary);
 }
 
 .feature-card:hover {
   transform: translateY(-8px);
-  border-color: var(--apple-blue);
-  box-shadow: 
-    0 8px 16px rgba(0, 0, 0, 0.05),
-    0 16px 32px rgba(0, 0, 0, 0.07);
-}
-
-.feature-card:hover::before {
-  opacity: 1;
+  box-shadow: 0 10px 25px rgba(46, 125, 50, 0.15);
+  background-color: #f8fffa;
 }
 
 .feature-icon {
   margin-bottom: 24px;
-  color: var(--apple-blue);
+  color: var(--primary);
   position: relative;
 }
 
@@ -499,7 +651,7 @@ const aiFeatures = ref([
   position: absolute;
   width: 60px;
   height: 60px;
-  background: var(--apple-blue);
+  background: var(--secondary);
   opacity: 0.1;
   border-radius: 50%;
   top: 50%;
@@ -515,50 +667,150 @@ const aiFeatures = ref([
 }
 
 .feature-card h3 {
-  color: var(--text-primary);
+  color: var(--dark);
   margin: 0 0 16px;
+  font-weight: 500;
 }
 
 .feature-card p {
-  color: var(--text-secondary);
+  color: #555;
   margin: 0;
 }
 
+/* 移动端适配 */
+@media (max-width: 900px) {
+  .card-container {
+    padding: 20px;
+  }
+  
+  .feature-card {
+    padding: 30px;
+  }
+}
+
+@media (max-width: 600px) {
+  .card-container {
+    padding: 16px;
+  }
+  
+  .feature-card {
+    padding: 24px;
+  }
+  
+  .update-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .book-meta {
+    width: 100%;
+  }
+  
+  .update-time {
+    width: auto;
+  }
+}
+
+/* 暗色模式 */
 @media (prefers-color-scheme: dark) {
+  .home {
+    background-color: var(--system-background);
+  }
+
   .banner-content::before {
-    background: linear-gradient(to right, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.4));
+    background: linear-gradient(to right, rgba(27, 94, 32, 0.9), rgba(20, 70, 24, 0.7));
+  }
+
+  .banner-text {
+    background: rgba(30, 30, 30, 0.4);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .banner-button {
+    background: var(--primary);
+    box-shadow: 0 4px 12px rgba(27, 94, 32, 0.2);
+  }
+
+  .banner-button:hover {
+    box-shadow: 0 6px 16px rgba(27, 94, 32, 0.3);
+  }
+
+  .card-container {
+    background: var(--system-grouped-secondary);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  }
+
+  .section-header {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .section-header h2 {
+    color: #000;
+  }
+
+  .section-header .el-button {
+    color: var(--secondary);
   }
 
   .book-card {
+    background: var(--system-grouped-secondary);
     border-color: rgba(255, 255, 255, 0.1);
   }
 
   .book-card:hover {
-    border-color: var(--apple-blue);
-    box-shadow: 
-      0 4px 12px rgba(0, 0, 0, 0.2),
-      0 12px 25px rgba(0, 0, 0, 0.3);
+    border-color: var(--primary);
+    box-shadow: 0 10px 25px rgba(46, 125, 50, 0.2);
+  }
+
+  .add-button {
+    background: rgba(60, 60, 60, 0.9);
+    color: var(--secondary);
+  }
+
+  .add-button:hover {
+    background: var(--primary);
+    color: white;
   }
 
   .latest-updates {
     border-color: rgba(255, 255, 255, 0.1);
+    background: var(--system-grouped-secondary);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .update-item {
+    background: var(--system-grouped-secondary);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .update-item:hover {
+    background-color: rgba(46, 125, 50, 0.1);
+  }
+
+  .update-time {
+    background: rgba(60, 60, 60, 0.5);
+    border-color: rgba(255, 255, 255, 0.08);
   }
 
   .feature-card {
     border-color: rgba(255, 255, 255, 0.1);
-    background: linear-gradient(
-      145deg,
-      var(--system-grouped-secondary) 0%,
-      rgba(255, 255, 255, 0.05) 100%
-    );
+    background: var(--system-grouped-secondary);
   }
 
   .feature-card:hover {
-    border-color: var(--apple-blue);
-    box-shadow: 
-      0 8px 16px rgba(0, 0, 0, 0.2),
-      0 16px 32px rgba(0, 0, 0, 0.3);
+    border-color: var(--primary);
+    background-color: rgba(46, 125, 50, 0.1);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  }
+
+  .feature-card h3 {
+    color: #000;
+  }
+
+  .feature-card p {
+    color: #000;
   }
 }
 </style> 

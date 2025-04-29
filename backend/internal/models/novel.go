@@ -108,17 +108,17 @@ func (sa *StringArray) Scan(value interface{}) error {
 }
 
 type Novel struct {
-	ID            uint           `json:"id" gorm:"primarykey"`
-	Title         string         `json:"title" gorm:"size:100;not null"`
-	Description   string         `json:"description" gorm:"type:text"`
-	Category      string         `json:"category" gorm:"size:50"`
-	CoverURL      string         `json:"coverUrl" gorm:"size:255"`
-	Status        int            `json:"status" gorm:"default:0"` // 0: 草稿, 1: 连载中, 2: 已完结
-	WordCount     int            `json:"wordCount" gorm:"default:0"`
-	ReadCount     int            `json:"readCount" gorm:"default:0"`
-	FavoriteCount int            `json:"favoriteCount" gorm:"default:0"`
-	AuthorID      uint           `json:"authorId" gorm:"not null;type:uint REFERENCES users(id)"`
-	Author        User           `json:"author" gorm:"foreignKey:AuthorID"`
+	ID            uint           `gorm:"primaryKey" json:"id"`
+	Title         string         `gorm:"size:255;not null" json:"title"`
+	Description   string         `gorm:"type:text" json:"description"`
+	CoverURL      string         `gorm:"size:255" json:"coverUrl"`
+	Category      string         `gorm:"size:50" json:"category"`
+	Status        int            `gorm:"default:0" json:"status"` // 0: 连载中, 1: 已完结
+	WordCount     int            `gorm:"default:0" json:"wordCount"`
+	ReadCount     int            `gorm:"default:0" json:"readCount"`
+	FavoriteCount int            `gorm:"default:0" json:"favoriteCount"`
+	AuthorID      uint           `gorm:"not null" json:"authorId"`
+	Author        User           `gorm:"foreignKey:AuthorID" json:"author"`
 	CreatedAt     time.Time      `json:"createdAt"`
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `json:"-" gorm:"index"`

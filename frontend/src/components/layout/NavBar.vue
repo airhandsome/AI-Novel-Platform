@@ -16,10 +16,6 @@
             <el-icon><House /></el-icon>
             首页
           </el-menu-item>
-          <el-menu-item index="/novels">
-            <el-icon><Reading /></el-icon>
-            小说广场
-          </el-menu-item>
           <el-menu-item index="/library">
             <el-icon><Reading /></el-icon>
             书库

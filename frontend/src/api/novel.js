@@ -45,7 +45,7 @@ export const novelApi = {
 
   // 获取章节详情
   getChapterDetail(chapterId) {
-    return request.get(`/chapters/${chapterId}`)
+    return request.get(`/v1/chapters/${chapterId}`)
   },
 
   // 创建新章节
@@ -64,23 +64,48 @@ export const novelApi = {
   },
 
   // 收藏小说
-  favoriteNovel(novelId) {
-    return request.post(`/novels/${novelId}/favorite`)
+  favoriteNovel: (novelId) => {
+    return request({
+      url: `/v1/novels/favorite/${novelId}`,
+      method: 'POST'
+    })
   },
 
   // 取消收藏
-  unfavoriteNovel(novelId) {
-    return request.delete(`/novels/${novelId}/favorite`)
+  unfavoriteNovel: (novelId) => {
+    return request({
+      url: `/v1/novels/favorite/${novelId}`,
+      method: 'DELETE'
+    })
+  },
+
+  // 获取收藏列表
+  getFavorites: (params) => {
+    return request({
+      url: '/v1/novels/favorites',
+      method: 'GET',
+      params
+    })
+  },
+  checkFavorite: (novelId) => {    
+    return request.get(`/v1/novels/favorite/${novelId}`)
   },
 
   // 更新阅读进度
-  updateReadProgress(data) {
-    return request.post('/reading-progress', data)
+  updateReadProgress: async (data) => {
+    return request({
+      url: '/v1/reading-progress',
+      method: 'post',
+      data
+    })
   },
 
   // 获取阅读进度
-  getReadProgress(novelId) {
-    return request.get(`/novels/${novelId}/reading-progress`)
+  getReadProgress: async (novelId) => {
+    return request({
+      url: `/v1/reading-progress/novel/${novelId}`,
+      method: 'get'
+    })
   },
 
   // AI 辅助写作
